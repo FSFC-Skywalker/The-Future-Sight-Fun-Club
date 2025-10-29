@@ -1,15 +1,15 @@
 Placeholder
 Must contain latest "Eclipse training jouney" .json.
 
+-----------------------
+
 How Trial Data is Encoded In The File Names
 
 -----------------------
 
-Trial Format:
+[Operator Number Identifier]-[Type of ESP]-[Trial Number(s)]-[Descriptor].png/.jpeg/etc...
 
-[Operator Number Identifier]-[Type of ESP]-[Trial Number(s)]-[Descriptor]
-
-For example
+A few examples:
 
 002-AC-1-Target: Operator #002 (Skywalker)'s AC Target for the first trial.
 
