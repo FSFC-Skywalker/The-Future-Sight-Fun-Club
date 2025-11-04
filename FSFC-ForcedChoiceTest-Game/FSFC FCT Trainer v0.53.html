@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FSFC Trainer — v0.5.1</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :focus { outline: 2px solid currentColor; outline-offset: 2px; }
+    .navbtn{ padding:0.5rem 0.75rem; border-radius:0.75rem; background: rgba(15,23,42,0.65); border:1px solid rgba(255,255,255,0.10); color:#e5e7eb; }
+    .navbtn:hover{ background:#334155; }
+    .active-tab{ background:#6366f1; color:#0f172a; }
+    .ctl{ padding:0.5rem 0.75rem; border-radius:0.5rem; background:#0b1324; border:1px solid rgba(255,255,255,0.10); color:#e5e7eb; width:100%; }
+    .ctl::placeholder{ color:#94a3b8; }
+    .ctl:focus{ outline:2px solid #6366f1; outline-offset:2px; }
+    .ctl:disabled{ opacity:0.7; color:#cbd5e1; background:#0f172a; cursor:not-allowed; }
+    select.ctl{ -webkit-text-fill-color:#e5e7eb; color:#e5e7eb; }
+    .color-swatch{ height:64px; border-radius:0.75rem; display:flex; align-items:center; justify-content:center; font-weight:600; }
+    .grid-btn{ aspect-ratio:1 / 1; border-radius:0.75rem; display:flex; align-items:center; justify-content:center; font-weight:600; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+  <div class="max-w-6xl mx-auto p-4 md:p-8">
+    <!-- Top Bar / App Nav -->
+    <header class="mb-6 flex items-center justify-between gap-3">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight">FSFC — Forced-Choice Trainer</h1>
+        <p class="text-slate-300 mt-1">Zener + Alphabet + Color + Grid • v0.5.1 • play mode • adjustable deck • pre/post sliders</p>
+      </div>
+      <nav class="flex gap-2 text-sm">
+        <button data-tab="home" class="navbtn active-tab">Home</button>
+        <button data-tab="zener" class="navbtn">Zener</button>
+        <button data-tab="alphabet" class="navbtn">Alphabet</button>
+        <button data-tab="color" class="navbtn">Color</button>
+        <button data-tab="grid" class="navbtn">Grid</button>
+        <button data-tab="stats" class="navbtn">Stats</button>
+      </nav>
+    </header>
+
+    <!-- ====== HOME / SPLASH ====== -->
+    <section id="tab-home" class="space-y-6">
+      <!-- Games Grid -->
+      <div class="bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h2 class="text-lg font-semibold">Pick a Game</h2>
+        <div id="homeGames" class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
+          <button type="button" data-tab-jump="zener" class="p-4 rounded-2xl bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-semibold shadow ring-1 ring-white/10">Zener</button>
+          <button type="button" data-tab-jump="alphabet" class="p-4 rounded-2xl bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-semibold shadow ring-1 ring-white/10">Alphabet</button>
+          <button type="button" data-tab-jump="color" class="p-4 rounded-2xl bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-semibold shadow ring-1 ring-white/10">Color</button>
+          <button type="button" data-tab-jump="grid" class="p-4 rounded-2xl bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-semibold shadow ring-1 ring-white/10">Grid</button>
+          <button type="button" disabled class="p-4 rounded-2xl bg-slate-800/70 text-slate-400 ring-1 ring-white/10">(More soon)</button>
+        </div>
+      </div>
+
+      <!-- Profile Import/Export -->
+      <div class="bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h2 class="text-lg font-semibold">Profile</h2>
+        <p class="text-slate-300 text-sm mt-1">Import or export your local FSFC trainer data. JSON supports <code>zener_sessions</code>, <code>alphabet_sessions</code>, <code>color_sessions</code>, and <code>grid_sessions</code>.</p>
+        <div class="mt-3 grid md:grid-cols-3 gap-3 items-end">
+          <div>
+            <label class="text-sm text-slate-300">Import JSON</label>
+            <input id="importFile" type="file" accept="application/json" class="block w-full mt-1 text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:bg-slate-700 file:text-slate-100 file:border-0 file:hover:bg-slate-600" />
+          </div>
+          <label class="flex items-center gap-2 text-sm mt-6 md:mt-0">
+            <input id="importModeMerge" type="checkbox" class="h-4 w-4" checked />
+            Merge with existing (uncheck to replace)
+          </label>
+          <div class="flex gap-2">
+            <button id="importBtn" class="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-semibold">Load Profile</button>
+            <button id="exportAllBtn" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Export Profile</button>
+          </div>
+        </div>
+        <p id="importStatus" class="text-xs text-slate-400 mt-2"></p>
+      </div>
+
+      <!-- Quick Stats Overview -->
+      <div class="bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h2 class="text-lg font-semibold">Overview</h2>
+        <p class="text-slate-400 text-xs">Zener aggregates charted; counts for others included below.</p>
+        <div id="homeOverview" class="mt-3 grid sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+        <div class="mt-4">
+          <canvas id="homeChart" height="120"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== ZENER TRAINER ====== -->
+    <section id="tab-zener" class="hidden">
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3">Session Setup — Zener</h2>
+          <form id="configForm" class="grid sm:grid-cols-2 gap-3">
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">Number of Trials</span>
+              <input id="numTrials" type="number" min="5" step="5" value="25" class="ctl" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">Feedback Mode</span>
+              <select id="mode" class="ctl">
+                <option value="immediate">Immediate (show after each guess)</option>
+                <option value="delayed">Delayed (reveal at end)</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">Target Generator</span>
+              <select id="targetGen" class="ctl">
+                <option value="rng">RNG (uniform)</option>
+                <option value="deck">Balanced Deck (multiples of 5)</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">Deck repeats (×5)</span>
+              <input id="zDeckRepeats" type="number" min="1" step="1" value="5" class="ctl" disabled />
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="playMode" type="checkbox" class="h-4 w-4" />
+              Play mode (don’t record)
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="collectPrePost" type="checkbox" class="h-4 w-4" />
+              Collect pre/post sliders
+            </label>
+            <label class="flex flex-col gap-1 sm:col-span-2">
+              <span class="text-sm text-slate-300">Label (optional)</span>
+              <input id="sessionLabel" type="text" placeholder="e.g., Evening Run / 2025-11-02" class="ctl" />
+            </label>
+          </form>
+
+          <!-- Pre sliders (hidden unless enabled) -->
+          <div id="preBlock" class="hidden mt-3 grid sm:grid-cols-3 gap-3">
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Focus</span><input id="preFocus" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Energy</span><input id="preEnergy" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Meditation</span><input id="preMeditation" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+          </div>
+
+          <div class="mt-3 flex items-end gap-2">
+            <button id="startBtn" type="button" class="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold">Start Session</button>
+            <button id="resetBtn" type="button" class="w-full md:w-auto px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Reset</button>
+          </div>
+
+          <div class="mt-4 text-sm text-slate-400">Chance baseline is p = 0.20 (5 symbols). z = (hits − n·p)/√(n·p·(1−p)). p-value computed via exact binomial tail (one-sided, ≥hits).</div>
+        </div>
+        <aside class="bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3">Live Stats</h2>
+          <dl class="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <dt class="text-slate-400">Trial</dt>
+              <dd id="trialCounter" class="text-xl font-semibold">0 / 0</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Hits</dt>
+              <dd id="hitCounter" class="text-xl font-semibold">0</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Expected</dt>
+              <dd id="expectedCounter" class="text-xl font-semibold">0.0</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">z-score</dt>
+              <dd id="zScore" class="text-xl font-semibold">—</dd>
+            </div>
+            <div class="col-span-2">
+              <dt class="text-slate-400">p (≥ hits, one-sided)</dt>
+              <dd id="pValue" class="text-xl font-semibold">—</dd>
+            </div>
+          </dl>
+          <div class="mt-4 border-t border-white/10 pt-3 text-xs text-slate-400" id="modeNote"></div>
+          <div class="mt-3 border-t border-white/10 pt-3">
+            <button id="openProfileBtn" class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-slate-950 text-sm font-semibold">Profile ▸</button>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Game Panel -->
+      <section class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-lg font-semibold">Make Your Pick</h2>
+          <div id="sessionStatus" class="text-sm text-amber-300">Idle — click Start Session</div>
+        </div>
+
+        <!-- Zener Buttons -->
+        <div class="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3" role="group" aria-label="Zener symbols">
+          <button class="zbtn px-3 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 ring-1 ring-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed" data-symbol="circle" aria-label="Circle">
+            <div class="zcard">
+              <svg viewBox="0 0 100 100" class="w-16 h-16 mx-auto">
+                <circle cx="50" cy="50" r="28" stroke="currentColor" stroke-width="8" fill="none"/>
+              </svg>
+              <span class="block mt-1">Circle</span>
+            </div>
+          </button>
+          <button class="zbtn px-3 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 ring-1 ring-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed" data-symbol="plus" aria-label="Plus">
+            <div class="zcard">
+              <svg viewBox="0 0 100 100" class="w-16 h-16 mx-auto">
+                <rect x="46" y="20" width="8" height="60" fill="currentColor"/>
+                <rect x="20" y="46" width="60" height="8" fill="currentColor"/>
+              </svg>
+              <span class="block mt-1">Plus</span>
+            </div>
+          </button>
+          <button class="zbtn px-3 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 ring-1 ring-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed" data-symbol="waves" aria-label="Waves">
+            <div class="zcard">
+              <svg viewBox="0 0 120 100" class="w-16 h-16 mx-auto">
+                <path d="M10,35 C25,20 45,20 60,35 C75,50 95,50 110,35" stroke="currentColor" stroke-width="8" fill="none"/>
+                <path d="M10,65 C25,50 45,50 60,65 C75,80 95,80 110,65" stroke="currentColor" stroke-width="8" fill="none"/>
+              </svg>
+              <span class="block mt-1">Waves</span>
+            </div>
+          </button>
+          <button class="zbtn px-3 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 ring-1 ring-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed" data-symbol="square" aria-label="Square">
+            <div class="zcard">
+              <svg viewBox="0 0 100 100" class="w-16 h-16 mx-auto">
+                <rect x="22" y="22" width="56" height="56" stroke="currentColor" stroke-width="8" fill="none"/>
+              </svg>
+              <span class="block mt-1">Square</span>
+            </div>
+          </button>
+          <button class="zbtn px-3 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 ring-1 ring-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed" data-symbol="star" aria-label="Star">
+            <div class="zcard">
+              <svg viewBox="0 0 100 100" class="w-16 h-16 mx-auto">
+                <path d="M50 12 L60 38 L88 38 L65 54 L74 82 L50 66 L26 82 L35 54 L12 38 L40 38 Z" fill="currentColor"/>
+              </svg>
+              <span class="block mt-1">Star</span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Feedback Row -->
+        <div id="feedback" class="mt-4 hidden">
+          <div id="feedbackText" class="text-base"></div>
+        </div>
+
+        <!-- Results Table -->
+        <div id="resultsPanel" class="mt-6 hidden">
+          <h3 class="text-lg font-semibold mb-2">Session Results</h3>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="text-slate-300">
+                <tr>
+                  <th class="text-left py-2 pr-3">#</th>
+                  <th class="text-left py-2 pr-3">Your Guess</th>
+                  <th class="text-left py-2 pr-3">Target</th>
+                  <th class="text-left py-2 pr-3">Hit?</th>
+                </tr>
+              </thead>
+              <tbody id="resultsBody" class="divide-y divide-white/10"></tbody>
+            </table>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button id="saveSessionBtn" class="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-semibold">Save Session</button>
+            <button id="exportCsvBtn" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Export CSV</button>
+            <button id="newSessionBtn" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold">New Session</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Saved Sessions (Local) -->
+      <section class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Saved Sessions (Local) — Zener</h2>
+          <div class="flex gap-2">
+            <button id="refreshProfileBtn" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm">Refresh</button>
+            <button id="clearSavedBtn" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm">Clear All</button>
+          </div>
+        </div>
+        <div id="savedList" class="mt-3 text-sm text-slate-300"></div>
+      </section>
+
+      <!-- Profile / Aggregates -->
+      <section class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg" id="profilePanel">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Profile (Zener focus)</h2>
+        </div>
+        <p class="text-slate-300 text-sm mt-1">Alphabet/Color/Grid are included in counts and export; detailed charts to follow.</p>
+        <div id="profileBody" class="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+        <div id="profileBreakdown" class="mt-4"></div>
+      </section>
+    </section>
+
+    <!-- ====== ALPHABET GAME ====== -->
+    <section id="tab-alphabet" class="hidden">
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3">Alphabet Game</h2>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">String length</span>
+              <input id="alphaLen" type="number" min="3" max="64" step="1" value="10" class="ctl" />
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="alphaPlayMode" type="checkbox" class="h-4 w-4" /> Play mode (don’t record)
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="alphaCollectPP" type="checkbox" class="h-4 w-4" /> Collect pre/post sliders
+            </label>
+            <label class="flex flex-col gap-1 sm:col-span-2">
+              <span class="text-sm text-slate-300">Your string (A–Z)</span>
+              <input id="alphaGuess" type="text" placeholder="TYPEYOURGUESS" class="ctl" />
+            </label>
+          </div>
+
+          <div id="alphaPreBlock" class="hidden mt-3 grid sm:grid-cols-3 gap-3">
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Focus</span><input id="alphaPreFocus" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Energy</span><input id="alphaPreEnergy" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Meditation</span><input id="alphaPreMeditation" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+          </div>
+
+          <div class="mt-3 flex items-end gap-2">
+            <button id="alphaStart" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold">Generate & Compare</button>
+            <button id="alphaReset" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Reset</button>
+          </div>
+
+          <p class="text-sm text-slate-400 mt-2">Baseline p = 1/26 per position. z = (hits − n·p)/√(n·p·(1−p)).</p>
+        </div>
+        <aside class="bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3">Result</h2>
+          <dl class="grid grid-cols-2 gap-2 text-sm">
+            <div><dt class="text-slate-400">Length</dt><dd id="alphaLenOut" class="text-xl font-semibold">0</dd></div>
+            <div><dt class="text-slate-400">Hits</dt><dd id="alphaHitsOut" class="text-xl font-semibold">0</dd></div>
+            <div><dt class="text-slate-400">Expected</dt><dd id="alphaExpOut" class="text-xl font-semibold">0</dd></div>
+            <div><dt class="text-slate-400">z-score</dt><dd id="alphaZOut" class="text-xl font-semibold">—</dd></div>
+            <div class="col-span-2"><dt class="text-slate-400">p (≥ hits)</dt><dd id="alphaPOut" class="text-xl font-semibold">—</dd></div>
+          </dl>
+        </aside>
+      </div>
+
+      <section id="alphaPanel" class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg hidden">
+        <h3 class="text-lg font-semibold mb-2">Comparison</h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm"><thead class="text-slate-300"><tr><th class="text-left py-2 pr-3">Pos</th><th class="text-left py-2 pr-3">You</th><th class="text-left py-2 pr-3">Target</th><th class="text-left py-2 pr-3">Hit?</th></tr></thead><tbody id="alphaBody" class="divide-y divide-white/10"></tbody></table>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button id="alphaSave" class="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-semibold">Save Session</button>
+          <button id="alphaExport" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Export CSV</button>
+        </div>
+      </section>
+    </section>
+
+    <!-- ====== COLOR GAME ====== -->
+    <section id="tab-color" class="hidden">
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3">Color Game</h2>
+          <form class="grid sm:grid-cols-2 gap-3">
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">Number of Trials</span>
+              <input id="colorTrials" type="number" min="6" step="6" value="30" class="ctl" />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">Feedback Mode</span>
+              <select id="colorMode" class="ctl">
+                <option value="immediate">Immediate</option>
+                <option value="delayed">Delayed</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">Target Generator</span>
+              <select id="colorGen" class="ctl">
+                <option value="rng">RNG (uniform)</option>
+                <option value="deck">Balanced Deck (multiples of 6)</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-slate-300">Deck repeats (×6)</span>
+              <input id="colorRepeats" type="number" min="1" step="1" value="5" class="ctl" disabled />
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="colorPlay" type="checkbox" class="h-4 w-4" /> Play mode (don’t record)
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input id="colorPP" type="checkbox" class="h-4 w-4" /> Collect pre/post sliders
+            </label>
+          </form>
+
+          <div id="colorPreBlock" class="hidden mt-3 grid sm:grid-cols-3 gap-3">
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Focus</span><input id="colorPreF" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Energy</span><input id="colorPreE" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Meditation</span><input id="colorPreM" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+          </div>
+
+          <div class="mt-3 flex items-end gap-2">
+            <button id="colorStart" type="button" class="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold">Start</button>
+            <button id="colorReset" type="button" class="w-full md:w-auto px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Reset</button>
+          </div>
+          <p class="text-sm text-slate-400 mt-2">Baseline p = 1/6. Balanced deck repeats each color equally.</p>
+        </div>
+        <aside class="bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3">Live Stats</h2>
+          <dl class="grid grid-cols-2 gap-2 text-sm">
+            <div><dt class="text-slate-400">Trial</dt><dd id="colorTrial" class="text-xl font-semibold">0 / 0</dd></div>
+            <div><dt class="text-slate-400">Hits</dt><dd id="colorHits" class="text-xl font-semibold">0</dd></div>
+            <div><dt class="text-slate-400">Expected</dt><dd id="colorExp" class="text-xl font-semibold">0.0</dd></div>
+            <div><dt class="text-slate-400">z-score</dt><dd id="colorZ" class="text-xl font-semibold">—</dd></div>
+            <div class="col-span-2"><dt class="text-slate-400">p (≥ hits)</dt><dd id="colorP" class="text-xl font-semibold">—</dd></div>
+          </dl>
+          <div id="colorNote" class="text-xs text-slate-400 mt-3"></div>
+        </aside>
+      </div>
+
+      <section class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h3 class="text-lg font-semibold mb-2">Choose a Color</h3>
+        <div id="colorBtns" class="grid grid-cols-3 sm:grid-cols-6 gap-3"></div>
+        <div id="colorFeedback" class="mt-4 hidden"><div id="colorFeedbackText" class="text-base"></div></div>
+        <div id="colorResults" class="mt-6 hidden">
+          <h3 class="text-lg font-semibold mb-2">Session Results</h3>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm"><thead class="text-slate-300"><tr><th class="text-left py-2 pr-3">#</th><th class="text-left py-2 pr-3">Your Guess</th><th class="text-left py-2 pr-3">Target</th><th class="text-left py-2 pr-3">Hit?</th></tr></thead><tbody id="colorBody" class="divide-y divide-white/10"></tbody></table>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button id="colorSave" class="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-semibold">Save Session</button>
+            <button id="colorExport" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Export CSV</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h2 class="text-lg font-semibold">Saved Sessions — Color</h2>
+        <div id="colorSaved" class="mt-3 text-sm text-slate-300"></div>
+      </section>
+    </section>
+
+    <!-- ====== GRID GAME (3×3 or 4×4) ====== -->
+    <section id="tab-grid" class="hidden">
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3">Grid Game</h2>
+          <form class="grid sm:grid-cols-2 gap-3">
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Grid Size</span>
+              <select id="gridSize" class="ctl"><option value="3">3×3</option><option value="4">4×4</option></select>
+            </label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Number of Trials</span>
+              <input id="gridTrials" type="number" min="9" step="9" value="45" class="ctl" />
+            </label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Feedback Mode</span>
+              <select id="gridMode" class="ctl"><option value="immediate">Immediate</option><option value="delayed">Delayed</option></select>
+            </label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Target Generator</span>
+              <select id="gridGen" class="ctl"><option value="rng">RNG (uniform)</option><option value="deck">Balanced Deck (multiples of cells)</option></select>
+            </label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Deck repeats (×cells)</span>
+              <input id="gridRepeats" type="number" min="1" step="1" value="5" class="ctl" disabled />
+            </label>
+            <label class="flex items-center gap-2 text-sm"><input id="gridPlay" type="checkbox" class="h-4 w-4" /> Play mode (don’t record)</label>
+            <label class="flex items-center gap-2 text-sm"><input id="gridPP" type="checkbox" class="h-4 w-4" /> Collect pre/post sliders</label>
+          </form>
+
+          <div id="gridPreBlock" class="hidden mt-3 grid sm:grid-cols-3 gap-3">
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Focus</span><input id="gridPreF" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Energy</span><input id="gridPreE" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+            <label class="flex flex-col gap-1"><span class="text-sm text-slate-300">Pre: Meditation</span><input id="gridPreM" type="range" min="0" max="10" step="1" value="5" class="w-full"></label>
+          </div>
+
+          <div class="mt-3 flex items-end gap-2">
+            <button id="gridStart" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold">Start</button>
+            <button id="gridReset" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Reset</button>
+          </div>
+          <p class="text-sm text-slate-400 mt-2">Baseline p = 1/Cells (9 or 16). Balanced deck repeats each cell equally.</p>
+        </div>
+        <aside class="bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3">Live Stats</h2>
+          <dl class="grid grid-cols-2 gap-2 text-sm">
+            <div><dt class="text-slate-400">Trial</dt><dd id="gridTrial" class="text-xl font-semibold">0 / 0</dd></div>
+            <div><dt class="text-slate-400">Hits</dt><dd id="gridHits" class="text-xl font-semibold">0</dd></div>
+            <div><dt class="text-slate-400">Expected</dt><dd id="gridExp" class="text-xl font-semibold">0.0</dd></div>
+            <div><dt class="text-slate-400">z-score</dt><dd id="gridZ" class="text-xl font-semibold">—</dd></div>
+            <div class="col-span-2"><dt class="text-slate-400">p (≥ hits)</dt><dd id="gridP" class="text-xl font-semibold">—</dd></div>
+          </dl>
+          <div id="gridNote" class="text-xs text-slate-400 mt-3"></div>
+        </aside>
+      </div>
+
+      <section class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h3 class="text-lg font-semibold mb-2">Select a Cell</h3>
+        <div id="gridBtns" class="grid grid-cols-3 gap-3"></div>
+        <div id="gridFeedback" class="mt-4 hidden"><div id="gridFeedbackText" class="text-base"></div></div>
+        <div id="gridResults" class="mt-6 hidden">
+          <h3 class="text-lg font-semibold mb-2">Session Results</h3>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm"><thead class="text-slate-300"><tr><th class="text-left py-2 pr-3">#</th><th class="text-left py-2 pr-3">Your Guess</th><th class="text-left py-2 pr-3">Target</th><th class="text-left py-2 pr-3">Hit?</th></tr></thead><tbody id="gridBody" class="divide-y divide-white/10"></tbody></table>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button id="gridSave" class="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-semibold">Save Session</button>
+            <button id="gridExport" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600">Export CSV</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h2 class="text-lg font-semibold">Saved Sessions — Grid</h2>
+        <div id="gridSaved" class="mt-3 text-sm text-slate-300"></div>
+      </section>
+    </section>
+
+    <!-- ====== STATS PAGE ====== -->
+    <section id="tab-stats" class="hidden">
+      <div class="bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h2 class="text-lg font-semibold">Progress Over Time</h2>
+        <div class="mt-2 flex items-center gap-3 text-sm">
+          <label class="text-slate-300">Game</label>
+          <select id="statsGame" class="ctl max-w-[200px]">
+            <option value="zener">Zener</option>
+            <option value="alphabet">Alphabet</option>
+            <option value="color">Color</option>
+            <option value="grid">Grid</option>
+          </select>
+        </div>
+        <p class="text-slate-300 text-sm mt-1">Cumulative z and per-session hit rate. (Grid accounts for changing chance levels.)</p>
+        <div class="mt-4 grid md:grid-cols-3 gap-3">
+          <div class="md:col-span-2">
+            <canvas id="statsChart" height="160"></canvas>
+          </div>
+          <div>
+            <div id="statsSummary" class="grid grid-cols-2 gap-2 text-sm"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 bg-slate-900/60 rounded-2xl p-4 ring-1 ring-white/10 shadow-lg">
+        <h2 class="text-lg font-semibold">All Sessions</h2>
+        <div id="statsTableWrap" class="overflow-x-auto mt-3"></div>
+        <h2 class="text-lg font-semibold">All Zener Sessions</h2>
+        <div id="statsTableWrap" class="overflow-x-auto mt-3"></div>
+      </div>
+    </section>
+
+    <footer class="mt-8 text-center text-xs text-slate-500">
+      FSFC Trainer v0.5.1 • Built for Anta • One-sided exact binomial p-values • Keyboard accessible • Created by ChatGPT 5: Thinking — November 2025
+    </footer>
+  </div>
+
+  <script>
+    // ======= Shared constants / utils =======
+    const SYMBOLS = ["circle","plus","waves","square","star"]; // Zener
+    const COLORS = ["red","blue","green","purple","yellow","orange"];
+    const pChanceZener = 1 / SYMBOLS.length; // 0.2
+    const pChanceAlpha = 1 / 26;
+    const pChanceColor = 1 / COLORS.length; // 1/6
+
+    function rngChoice(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+    function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
+
+    function binomTailGTE(n, k, p){ if (k<=0) return 1.0; if (k>n) return 0.0; let t=0; for(let i=k;i<=n;i++) t+=binomPMF(n,i,p); return Math.min(1,Math.max(0,t)); }
+    function binomPMF(n, k, p){ if (k<0||k>n) return 0; if (p===0) return k===0?1:0; if (p===1) return k===n?1:0; const logC=logChoose(n,k); const logP=k*Math.log(p)+(n-k)*Math.log(1-p); return Math.exp(logC+logP); }
+    function logChoose(n,k){ return logFactorial(n)-logFactorial(k)-logFactorial(n-k); }
+    const logFactCache={0:0};
+    function logFactorial(n){ if (n in logFactCache) return logFactCache[n]; let acc=logFactCache[Object.keys(logFactCache).length-1]||0; for(let i=Object.keys(logFactCache).length;i<=n;i++){ acc+=Math.log(i); logFactCache[i]=acc; } return logFactCache[n]; }
+    function fmt(x,d=3){ if (x===null||Number.isNaN(x)) return '—'; return Number(x).toFixed(d); }
+    function escapeHtml(str){ return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+    function zScore(h,n,p){ if(!n) return null; const sd=Math.sqrt(n*p*(1-p)); if(!sd) return null; return (h-n*p)/sd; }
+    function clamp10(x){ const v=Math.max(0,Math.min(10,parseInt(x||'0',10))); return v; }
+
+    // ======= Storage / Profile keys =======
+    const KEY_ZENER='fsfc_zener_sessions';
+    const KEY_ALPHA='fsfc_alphabet_sessions';
+    const KEY_COLOR='fsfc_color_sessions';
+    const KEY_GRID ='fsfc_grid_sessions';
+
+    const getSessions = ()=> JSON.parse(localStorage.getItem(KEY_ZENER)||'[]');
+    const setSessions = (a)=> localStorage.setItem(KEY_ZENER, JSON.stringify(a));
+    const getAlpha = ()=> JSON.parse(localStorage.getItem(KEY_ALPHA)||'[]');
+    const setAlpha = (a)=> localStorage.setItem(KEY_ALPHA, JSON.stringify(a));
+    const getColor = ()=> JSON.parse(localStorage.getItem(KEY_COLOR)||'[]');
+    const setColor = (a)=> localStorage.setItem(KEY_COLOR, JSON.stringify(a));
+    const getGrid = ()=> JSON.parse(localStorage.getItem(KEY_GRID)||'[]');
+    const setGrid = (a)=> localStorage.setItem(KEY_GRID, JSON.stringify(a));
+
+    // ======= TABS =======
+    const tabButtons = document.querySelectorAll('button[data-tab]');
+    const tabs = { home: document.getElementById('tab-home'), zener: document.getElementById('tab-zener'), alphabet: document.getElementById('tab-alphabet'), color: document.getElementById('tab-color'), grid: document.getElementById('tab-grid'), stats: document.getElementById('tab-stats') };
+    tabButtons.forEach(btn=> btn.addEventListener('click', ()=> switchTab(btn.getAttribute('data-tab'))));
+    const homeGames = document.getElementById('homeGames');
+    if(homeGames){
+      homeGames.addEventListener('click', (e)=>{
+        const btn = e.target.closest('[data-tab-jump]');
+        if(!btn) return;
+        e.preventDefault();
+        switchTab(btn.getAttribute('data-tab-jump'));
+      });
+    }
+    function switchTab(name){ Object.entries(tabs).forEach(([k,el])=> el.classList.toggle('hidden', k!==name)); tabButtons.forEach(b=> b.classList.toggle('active-tab', b.getAttribute('data-tab')===name)); if (name==='stats') renderStats(); if (name==='home') renderHomeOverview(); }
+
+    // ======= ZENER GAME =======
+    let session=null, currentDeck=null;
+    function expectedHitsZ(n){ return n * pChanceZener; }
+
+    document.getElementById('collectPrePost').addEventListener('change',(e)=>{ document.getElementById('preBlock').classList.toggle('hidden', !e.target.checked); });
+    document.getElementById('targetGen').addEventListener('change', updateZenerDeckUI);
+    document.getElementById('zDeckRepeats').addEventListener('input', ()=>{ if (document.getElementById('targetGen').value==='deck'){ const r=Math.max(1,parseInt(document.getElementById('zDeckRepeats').value||'1',10)); document.getElementById('numTrials').value = r*5; }});
+    function updateZenerDeckUI(){ const gen=document.getElementById('targetGen').value; const trials=document.getElementById('numTrials'); const rep=document.getElementById('zDeckRepeats'); if (gen==='deck'){ rep.disabled=false; const r=Math.max(1,parseInt(rep.value||'5',10)); trials.value = r*5; trials.disabled=true; document.getElementById('modeNote').textContent='Balanced Deck selected: total trials = repeats × 5.'; } else { trials.disabled=false; document.getElementById('modeNote').textContent=''; rep.disabled=true; } }
+
+    function newSession(totalTrials, mode, label, playMode, collectPP){ session={ id:Date.now(), label:label||'', mode, totalTrials, trials:[], hits:0, ended:false, startedAt:new Date().toISOString(), endedAt:null, playMode:!!playMode, collectPP:!!collectPP, pre:null, post:null, targetGen: document.getElementById('targetGen').value, deckRepeats: parseInt(document.getElementById('zDeckRepeats').value||'0',10) };
+      if (collectPP){ session.pre={ focus:+document.getElementById('preFocus').value, energy:+document.getElementById('preEnergy').value, meditation:+document.getElementById('preMeditation').value }; }
+      if (session.targetGen==='deck'){ const reps=session.deckRepeats||Math.ceil(totalTrials/5); currentDeck = shuffle([ ...Array(reps).fill('circle'), ...Array(reps).fill('plus'), ...Array(reps).fill('waves'), ...Array(reps).fill('square'), ...Array(reps).fill('star') ]); } else currentDeck=null;
+      updateLiveStats(); setStatus(`Session active — ${mode==='immediate'?'Immediate':'Delayed'}${session.playMode?' — PLAY MODE':''}`); document.querySelectorAll('.zbtn').forEach(btn=>btn.disabled=false); document.getElementById('resultsPanel').classList.add('hidden'); document.getElementById('feedback').classList.add('hidden'); }
+    function endSession(){ if(!session||session.ended) return; session.ended=true; session.endedAt=new Date().toISOString(); document.querySelectorAll('.zbtn').forEach(btn=>btn.disabled=true); setStatus('Session complete.'); if (session.collectPP){ const f=prompt('Post: Focus (0-10)','5'); const e=prompt('Post: Energy (0-10)','5'); const m=prompt('Post: Meditation (0-10)','5'); session.post={ focus:clamp10(f), energy:clamp10(e), meditation:clamp10(m) }; } updateLiveStats(); renderResultsTable(); document.getElementById('resultsPanel').classList.remove('hidden'); if (!session.playMode){ saveSessionLocal(); renderProfile(); } else { document.getElementById('modeNote').textContent='Play mode: session was NOT saved.'; } }
+
+    function updateLiveStats(){ const n=session?session.trials.length:0; const hits=session?session.hits:0; const delayedHide=session && session.mode==='delayed' && !session.ended; document.getElementById('trialCounter').textContent = delayedHide?'—':`${n} / ${session?session.totalTrials:0}`; document.getElementById('hitCounter').textContent = delayedHide?'—':hits; document.getElementById('expectedCounter').textContent = delayedHide?'—':fmt(expectedHitsZ(n),2); const z=delayedHide?null:zScore(hits,n,pChanceZener); document.getElementById('zScore').textContent = (z===null)?'—':fmt(z,3); const p=delayedHide?null:binomTailGTE(n,hits,pChanceZener); document.getElementById('pValue').textContent = (p===null||n===0)?'—':p.toExponential(3); }
+    function setStatus(text){ document.getElementById('sessionStatus').textContent=text; }
+
+    function handleGuess(guess){ if(!session||session.ended) return; const idx=session.trials.length+1; const target = (session.targetGen==='deck' && currentDeck) ? currentDeck[idx-1] : rngChoice(SYMBOLS); const hit=(guess===target); session.trials.push({idx,guess,target,hit}); if(hit) session.hits++; if(session.mode==='immediate') showFeedback(hit,target); updateLiveStats(); if(session.trials.length>=session.totalTrials) endSession(); }
+    function showFeedback(hit,target){ const box=document.getElementById('feedback'); const txt=document.getElementById('feedbackText'); box.classList.remove('hidden'); txt.innerHTML = hit? `<span class="text-emerald-400 font-semibold">Hit!</span> Target was <span class="font-semibold">${target}</span>.` : `<span class="text-rose-400 font-semibold">Miss.</span> Target was <span class="font-semibold">${target}</span>.`; }
+    function renderResultsTable(){ const body=document.getElementById('resultsBody'); body.innerHTML=''; for(const t of session.trials){ const tr=document.createElement('tr'); tr.innerHTML=`<td class="py-2 pr-3 text-slate-300">${t.idx}</td><td class="py-2 pr-3">${t.guess}</td><td class="py-2 pr-3">${t.target}</td><td class="py-2 pr-3">${t.hit?'✔︎':'—'}</td>`; body.appendChild(tr); } }
+    function buildSessionSummary(){ const n=session.trials.length, hits=session.hits; return { id:session.id,label:session.label,mode:session.mode,totalTrials:session.totalTrials,n,hits,expected:expectedHitsZ(n),z:zScore(hits,n,pChanceZener),p_one_sided:binomTailGTE(n,hits,pChanceZener),startedAt:session.startedAt,endedAt:session.endedAt,trials:session.trials,playMode:session.playMode,collectPP:session.collectPP,pre:session.pre,post:session.post,targetGen:session.targetGen,deckRepeats:session.deckRepeats }; }
+    function saveSessionLocal(){ const data=getSessions(); data.push(buildSessionSummary()); setSessions(data); renderSavedList(); }
+
+    function renderSavedList(){ const data=getSessions(); const box=document.getElementById('savedList'); if(!data.length){ box.innerHTML='<p class="text-slate-500">No saved sessions yet.</p>'; return; } box.innerHTML=''; const ul=document.createElement('ul'); ul.className='space-y-2'; data.slice().reverse().forEach((s)=>{ const li=document.createElement('li'); li.className='p-3 bg-slate-800/60 rounded-xl ring-1 ring-white/10'; const label=s.label?` — <span class="text-slate-300">${escapeHtml(s.label)}</span>`:''; li.innerHTML=`<div class="flex items-center justify-between"><div><div class="font-semibold">${new Date(s.startedAt).toLocaleString()}${label}</div><div class="text-slate-300 text-sm">${s.n} trials • hits ${s.hits} • expected ${fmt(s.expected,2)} • z ${fmt(s.z,3)} • p ${Number(s.p_one_sided).toExponential(3)} • gen ${s.targetGen}${s.deckRepeats?`×${s.deckRepeats}`:''}</div></div><button class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs" data-dl="${s.id}">Export CSV</button></div>`; ul.appendChild(li); }); box.appendChild(ul); box.querySelectorAll('[data-dl]').forEach(btn=>{ btn.addEventListener('click', ()=>{ const s=getSessions().find(x=>String(x.id)===btn.getAttribute('data-dl')); if(s) downloadCsvZener(s); }); }); }
+
+    function toCsvZener(summary){ const header=['idx','guess','target','hit']; const rows=summary.trials.map(t=>[t.idx,t.guess,t.target,t.hit?1:0]); const meta=[ ['id',summary.id],['label',summary.label||''],['mode',summary.mode],['targetGen',summary.targetGen],['deckRepeats',summary.deckRepeats||''],['totalTrials',summary.totalTrials],['n',summary.n],['hits',summary.hits],['expected',summary.expected],['z',summary.z],['p_one_sided',summary.p_one_sided],['startedAt',summary.startedAt],['endedAt',summary.endedAt],['playMode',summary.playMode],['collectPP',summary.collectPP],['pre',JSON.stringify(summary.pre||{})],['post',JSON.stringify(summary.post||{})] ]; const metaCsv=meta.map(r=>r.map(x=>`"${String(x).replaceAll('"','""')}"`).join(',')).join('\n'); const tableCsv=[header.join(',')].concat(rows.map(r=>r.join(','))).join('\n'); return metaCsv+'\n\n'+tableCsv+'\n'; }
+    function downloadCsvZener(summary){ const blob=new Blob([toCsvZener(summary)],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`fsfc_zener_${summary.id}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); }
+
+    // ======= Import / Export Profile =======
+    function exportAll(){ const payload={ version:'0.5.1', exportedAt:new Date().toISOString(), zener_sessions:getSessions(), alphabet_sessions:getAlpha(), color_sessions:getColor(), grid_sessions:getGrid() }; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='fsfc_profile.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); }
+    function importFromFile(file,merge=true){ const status=document.getElementById('importStatus'); status.textContent='Parsing…'; const reader=new FileReader(); reader.onload=()=>{ try{ const json=JSON.parse(reader.result); const pick=(arr)=> Array.isArray(arr)?arr:[]; const z=Array.isArray(json)? json : pick(json.zener_sessions); const a=pick(json.alphabet_sessions); const c=pick(json.color_sessions); const g=pick(json.grid_sessions); const mergeById=(existing,incoming)=>{ const m=new Map(existing.map(s=>[String(s.id||Math.random()),s])); for(const s of incoming){ if(!s||typeof s!=='object') continue; if(!s.id) s.id=Date.now()+Math.random(); m.set(String(s.id),s); } return Array.from(m.values()); }; if(merge){ setSessions(mergeById(getSessions(),z)); setAlpha(mergeById(getAlpha(),a)); setColor(mergeById(getColor(),c)); setGrid(mergeById(getGrid(),g)); } else { if(z.length) setSessions(z); if(a.length) setAlpha(a); if(c.length) setColor(c); if(g.length) setGrid(g); } status.textContent=`Imported ${z.length} zener • ${a.length} alphabet • ${c.length} color • ${g.length} grid sessions.`; renderSavedList(); renderProfile(); renderHomeOverview(); if(window._statsChart) window._statsChart.update(); }catch(e){ status.textContent='Import failed: '+e.message; } }; reader.onerror=()=> status.textContent='Failed to read file'; reader.readAsText(file); }
+
+    // ======= Aggregates (Zener focus in charts) =======
+    function aggregateZener(){ const data=getSessions(); const p=pChanceZener; let totalN=0,totalHits=0; const byMode={}; for(const s of data){ const n=s.n||s.totalTrials||0; const h=s.hits||0; totalN+=n; totalHits+=h; const m=s.mode||'unknown'; byMode[m]=byMode[m]||{n:0,hits:0,sessions:0}; byMode[m].n+=n; byMode[m].hits+=h; byMode[m].sessions++; } const overallZ = totalN ? (totalHits-totalN*p)/Math.sqrt(totalN*p*(1-p)) : null; const overallP = totalN ? binomTailGTE(totalN,totalHits,p) : null; return { data,totalN,totalHits,overallZ,overallP,byMode }; }
+
+    function renderProfile(){ const { data,totalN,totalHits,overallZ,overallP,byMode }=aggregateZener(); const body=document.getElementById('profileBody'); const bd=document.getElementById('profileBreakdown'); body.innerHTML=''; const cards=[ {label:'Zener Sessions', value:data.length}, {label:'Zener Trials', value:totalN}, {label:'Zener Hits', value:totalHits}, {label:'Overall z', value:overallZ==null?'—':fmt(overallZ,3)}, {label:'Overall p', value:overallP==null?'—':Number(overallP).toExponential(3)}, {label:'Alphabet Sessions', value:getAlpha().length}, {label:'Color Sessions', value:getColor().length}, {label:'Grid Sessions', value:getGrid().length} ]; for(const c of cards){ const div=document.createElement('div'); div.className='p-4 rounded-xl bg-slate-800/60 ring-1 ring-white/10 shadow'; div.innerHTML=`<div class="text-slate-400 text-sm">${c.label}</div><div class="text-2xl font-semibold">${c.value}</div>`; body.appendChild(div); }
+      const entries=Object.entries(byMode); if(entries.length){ let html='<h3 class="text-base font-semibold mb-2">Zener by Mode</h3>'; html+='<div class="overflow-x-auto"><table class="min-w-full text-sm">'; html+='<thead class="text-slate-300"><tr><th class="text-left py-2 pr-3">Mode</th><th class="text-left py-2 pr-3">Sessions</th><th class="text-left py-2 pr-3">Trials</th><th class="text-left py-2 pr-3">Hits</th><th class="text-left py-2 pr-3">z</th><th class="text-left py-2 pr-3">p</th></tr></thead><tbody class="divide-y divide-white/10">'; for(const [mode,rec] of entries){ const z = rec.n ? (rec.hits-rec.n*pChanceZener)/Math.sqrt(rec.n*pChanceZener*(1-pChanceZener)) : null; const p = rec.n ? binomTailGTE(rec.n,rec.hits,pChanceZener) : null; html += `<tr><td class="py-2 pr-3">${mode}</td><td class="py-2 pr-3">${rec.sessions}</td><td class="py-2 pr-3">${rec.n}</td><td class="py-2 pr-3">${rec.hits}</td><td class="py-2 pr-3">${z==null?'—':fmt(z,3)}</td><td class="py-2 pr-3">${p==null?'—':Number(p).toExponential(3)}</td></tr>`; } html+='</tbody></table></div>'; bd.innerHTML=html; } else { bd.innerHTML='<p class="text-slate-500">No data yet. Complete a session to populate your profile.</p>'; } }
+
+    function aggregateAlpha(){ const data=getAlpha(); const p=pChanceAlpha; let N=0,H=0; for(const s of data){ const n=s.n||((s.target||'').length)||0; const h=s.hits||0; N+=n; H+=h; } const Z = N? (H - N*p)/Math.sqrt(N*p*(1-p)) : null; const P = N? binomTailGTE(N,H,p) : null; return {data,N,H,Z,P}; }
+    function aggregateColor(){ const data=getColor(); const p=pChanceColor; let N=0,H=0; for(const s of data){ const n=s.n||s.totalTrials||0; const h=s.hits||0; N+=n; H+=h; } const Z = N? (H - N*p)/Math.sqrt(N*p*(1-p)) : null; const P = N? binomTailGTE(N,H,p) : null; return {data,N,H,Z,P}; }
+    function aggregateGrid(){ const data=getGrid(); // varying p per session
+      let E=0, V=0, N=0, H=0; // totals across sessions
+      for(const s of data){ const n=s.n||s.totalTrials||0; const h=s.hits||0; const p = s.cells ? (1/s.cells) : (1/9); E += n*p; V += n*p*(1-p); N += n; H += h; }
+      const Z = V>0 ? (H - E)/Math.sqrt(V) : null; const P = (N>0 && V>0) ? binomTailGTE(N,H, E/N) : null; // approximate one-sided using pooled p
+      return {data,N,H,E,V,Z,P}; }
+
+    function renderHomeOverview(){
+      const z=aggregateZener();
+      const a=aggregateAlpha();
+      const c=aggregateColor();
+      const g=aggregateGrid();
+      const wrap=document.getElementById('homeOverview');
+      wrap.innerHTML='';
+      const cards=[
+        {label:'Zener Sessions', value:z.data.length},
+        {label:'Zener z', value:z.overallZ==null?'—':fmt(z.overallZ,3)},
+        {label:'Alphabet Sessions', value:a.data.length},
+        {label:'Alphabet z', value:a.Z==null?'—':fmt(a.Z,3)},
+        {label:'Color Sessions', value:c.data.length},
+        {label:'Color z', value:c.Z==null?'—':fmt(c.Z,3)},
+        {label:'Grid Sessions', value:g.data.length},
+        {label:'Grid z', value:g.Z==null?'—':fmt(g.Z,3)}
+      ];
+      for(const c of cards){ const div=document.createElement('div'); div.className='p-4 rounded-xl bg-slate-800/60 ring-1 ring-white/10'; div.innerHTML=`<div class="text-slate-400 text-sm">${c.label}</div><div class="text-2xl font-semibold">${c.value}</div>`; wrap.appendChild(div); }
+      const ctx=document.getElementById('homeChart').getContext('2d');
+      const seq=getSessions();
+      const cum=[]; let N=0,H=0; seq.forEach((s)=>{ N+=(s.n||0); H+=(s.hits||0); const z=zScore(H,N,pChanceZener); cum.push(z??0); });
+      if(window._homeChart) window._homeChart.destroy();
+      window._homeChart=new Chart(ctx,{ type:'line', data:{ labels: seq.map((_,i)=> i+1), datasets:[{ label:'Zener cumulative z', data:cum, tension:0.2 }]}, options:{ responsive:true, scales:{ x:{ title:{ display:true, text:'Session'}}, y:{ title:{ display:true, text:'z'}}}} });
+    }
+
+    // ======= Stats Page (Zener) =======
+    function collectSeries(game){
+      if(game==='zener'){
+        const data=aggregateZener().data; const p=pChanceZener; let E=0,V=0,H=0,N=0; const cumZ=[],hr=[]; data.forEach(s=>{ const n=s.n||0,h=s.hits||0; E += n*p; V += n*p*(1-p); H += h; N += n; cumZ.push(V>0? (H-E)/Math.sqrt(V):0); hr.push(n? h/n : 0); }); return {data,cumZ,hr,labels:data.map((_,i)=>i+1)};
+      }
+      if(game==='alphabet'){
+        const data=aggregateAlpha().data; const p=pChanceAlpha; let E=0,V=0,H=0,N=0; const cumZ=[],hr=[]; data.forEach(s=>{ const n=s.n||((s.target||'').length)||0; const h=s.hits||0; E += n*p; V += n*p*(1-p); H += h; N += n; cumZ.push(V>0? (H-E)/Math.sqrt(V):0); hr.push(n? h/n : 0); }); return {data,cumZ,hr,labels:data.map((_,i)=>i+1)};
+      }
+      if(game==='color'){
+        const data=aggregateColor().data; const p=pChanceColor; let E=0,V=0,H=0,N=0; const cumZ=[],hr=[]; data.forEach(s=>{ const n=s.n||0,h=s.hits||0; E += n*p; V += n*p*(1-p); H += h; N += n; cumZ.push(V>0? (H-E)/Math.sqrt(V):0); hr.push(n? h/n : 0); }); return {data,cumZ,hr,labels:data.map((_,i)=>i+1)};
+      }
+      if(game==='grid'){
+        const data=aggregateGrid().data; let E=0,V=0,H=0,N=0; const cumZ=[],hr=[]; data.forEach(s=>{ const n=s.n||0,h=s.hits||0; const p = s.cells ? 1/s.cells : 1/9; E += n*p; V += n*p*(1-p); H += h; N += n; cumZ.push(V>0? (H-E)/Math.sqrt(V):0); hr.push(n? h/n : 0); }); return {data,cumZ,hr,labels:data.map((_,i)=>i+1)};
+      }
+      return {data:[],cumZ:[],hr:[],labels:[]};
+    }
+    function renderStats(){
+      const game=document.getElementById('statsGame').value;
+      const {data,cumZ,hr,labels}=collectSeries(game);
+      const ctx=document.getElementById('statsChart').getContext('2d');
+      if(window._statsChart) window._statsChart.destroy();
+      window._statsChart=new Chart(ctx,{ type:'line', data:{ labels, datasets:[ {label:'Cumulative z', data:cumZ, yAxisID:'y'}, {label:'Per-session hit rate', data:hr, yAxisID:'y1'} ]}, options:{ interaction:{ mode:'index', intersect:false }, responsive:true, scales:{ y:{ title:{ display:true, text:'z' }}, y1:{ position:'right', min:0, max:1, title:{ display:true, text:'hit rate'} }}}});
+      const sumDiv=document.getElementById('statsSummary'); sumDiv.innerHTML='';
+      const totN=data.reduce((a,s)=>a+(s.n|| (s.target?s.target.length:0) ||0),0);
+      const totH=data.reduce((a,s)=>a+(s.hits||0),0);
+      const cards=[ {label:'Sessions', value:data.length},{label:'Trials', value:totN},{label:'Hits', value:totH},{label:'Overall hit rate', value: totN?fmt(totH/totN,3):'—'} ];
+      for (const c of cards){ const d=document.createElement('div'); d.className='p-3 rounded-xl bg-slate-800/60 ring-1 ring-white/10'; d.innerHTML=`<div class=\"text-slate-400 text-sm\">${c.label}</div><div class=\"text-xl font-semibold\">${c.value}</div>`; sumDiv.appendChild(d); }
+      const wrap=document.getElementById('statsTableWrap');
+      const rows=data.map((s,i)=>{
+        const date=new Date(s.startedAt||Date.now()).toLocaleString();
+        const mode=s.mode||''; const gen=s.targetGen||s.gen||''; const n=s.n|| (s.target?s.target.length: s.totalTrials||0); const p=s.p_one_sided; const z=s.z; const exp = s.expected ?? ( (gen==='rng'||gen==='deck'||game!=='grid') ? fmt((game==='zener'?pChanceZener:game==='color'?pChanceColor:game==='alphabet'?pChanceAlpha: (s.cells?1/s.cells:1/9))*n,2) : '');
+        return `<tr><td class=\"py-2 pr-3\">${i+1}</td><td class=\"py-2 pr-3\">${date}</td><td class=\"py-2 pr-3\">${mode}</td><td class=\"py-2 pr-3\">${gen||''}</td><td class=\"py-2 pr-3\">${n}</td><td class=\"py-2 pr-3\">${s.hits||0}</td><td class=\"py-2 pr-3\">${exp}</td><td class=\"py-2 pr-3\">${z==null?'—':fmt(z,3)}</td><td class=\"py-2 pr-3\">${p==null?'—':Number(p).toExponential(3)}</td></tr>`;
+      }).join('');
+      wrap.innerHTML = `<div class=\"overflow-x-auto\"><table class=\"min-w-full text-sm\"><thead class=\"text-slate-300\"><tr><th class=\"text-left py-2 pr-3\">#</th><th class=\"text-left py-2 pr-3\">Date</th><th class=\"text-left py-2 pr-3\">Mode</th><th class=\"text-left py-2 pr-3\">Generator</th><th class=\"text-left py-2 pr-3\">Trials</th><th class=\"text-left py-2 pr-3\">Hits</th><th class=\"text-left py-2 pr-3\">Expected</th><th class=\"text-left py-2 pr-3\">z</th><th class=\"text-left py-2 pr-3\">p</th></tr></thead><tbody class=\"divide-y divide-white/10\">${rows}</tbody></table></div>`;
+    }
+
+    // ======= Events Zener =======
+    document.getElementById('startBtn').addEventListener('click', ()=>{ const total=Math.max(5, parseInt(document.getElementById('numTrials').value||'25',10)); const mode=document.getElementById('mode').value; const label=document.getElementById('sessionLabel').value.trim(); const play=document.getElementById('playMode').checked; const cpp=document.getElementById('collectPrePost').checked; newSession(total,mode,label,play,cpp); });
+    document.getElementById('resetBtn').addEventListener('click', ()=>{ session=null; document.querySelectorAll('.zbtn').forEach(btn=>btn.disabled=true); setStatus('Idle — click Start Session'); document.getElementById('trialCounter').textContent='0 / 0'; document.getElementById('hitCounter').textContent='0'; document.getElementById('expectedCounter').textContent='0.0'; document.getElementById('zScore').textContent='—'; document.getElementById('pValue').textContent='—'; document.getElementById('feedback').classList.add('hidden'); document.getElementById('resultsPanel').classList.add('hidden'); document.getElementById('modeNote').textContent=''; });
+    document.querySelectorAll('.zbtn').forEach(btn=>{ btn.addEventListener('click', ()=>{ if(!session||session.ended) return; handleGuess(btn.getAttribute('data-symbol')); }); btn.disabled=true; });
+    document.getElementById('saveSessionBtn').addEventListener('click', ()=>{ if(!session||!session.ended){ alert('Finish the session first.'); return; } if(session.playMode){ alert('Play mode: not saved.'); return; } saveSessionLocal(); });
+    document.getElementById('exportCsvBtn').addEventListener('click', ()=>{ if(!session||!session.ended){ alert('Finish the session first.'); return; } const s=buildSessionSummary(); const blob=new Blob([toCsvZener(s)],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`fsfc_zener_${s.id}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); });
+    document.getElementById('newSessionBtn').addEventListener('click', ()=>{ document.getElementById('resultsPanel').classList.add('hidden'); setStatus('Idle — click Start Session'); });
+    document.getElementById('clearSavedBtn').addEventListener('click', ()=>{ if(confirm('Delete all saved sessions from this browser (Zener + Alphabet + Color + Grid)?')){ localStorage.removeItem(KEY_ZENER); localStorage.removeItem(KEY_ALPHA); localStorage.removeItem(KEY_COLOR); localStorage.removeItem(KEY_GRID); renderSavedList(); renderColorSaved(); renderGridSaved(); renderProfile(); renderHomeOverview(); }});
+    document.getElementById('openProfileBtn').addEventListener('click', ()=>{ document.getElementById('profilePanel').scrollIntoView({ behavior:'smooth' }); });
+    document.getElementById('refreshProfileBtn').addEventListener('click', ()=>{ renderProfile(); renderHomeOverview(); });
+    document.getElementById('exportAllBtn').addEventListener('click', exportAll);
+    document.getElementById('importBtn').addEventListener('click', ()=>{ const file=document.getElementById('importFile').files[0]; if(!file){ document.getElementById('importStatus').textContent='Choose a JSON file first.'; return; } importFromFile(file, document.getElementById('importModeMerge').checked); });
+
+    // ======= Alphabet Wiring =======
+    document.getElementById('alphaCollectPP').addEventListener('change',(e)=>{ document.getElementById('alphaPreBlock').classList.toggle('hidden', !e.target.checked); });
+    const alphaGuess = document.getElementById('alphaGuess');
+    const alphaLen = document.getElementById('alphaLen');
+    alphaGuess.addEventListener('input',()=>{ const n=Math.max(0, Math.min(64, parseInt(alphaLen.value||'10',10))); let v=(alphaGuess.value||'').toUpperCase().replace(/[^A-Z]/g,''); if(v.length>n) v=v.slice(0,n); alphaGuess.value=v; });
+
+    function buildAlphaTarget(n){ let s=''; for(let i=0;i<n;i++){ s += String.fromCharCode(65 + Math.floor(Math.random()*26)); } return s; }
+    function alphaExpected(n){ return n * pChanceAlpha; }
+
+    document.getElementById('alphaStart').addEventListener('click', ()=>{ const n=Math.max(1,Math.min(64,parseInt(alphaLen.value||'10',10))); const raw=(alphaGuess.value||'').toUpperCase().replace(/[^A-Z]/g,''); if(raw.length!==n){ alert(`Your string must be exactly length ${n}.`); return; } const play=document.getElementById('alphaPlayMode').checked; const cpp=document.getElementById('alphaCollectPP').checked; const pre = cpp ? { focus:+document.getElementById('alphaPreFocus').value, energy:+document.getElementById('alphaPreEnergy').value, meditation:+document.getElementById('alphaPreMeditation').value } : null; const target=buildAlphaTarget(n); let hits=0; const rows=[]; for(let i=0;i<n;i++){ const g=raw[i], t=target[i]; const hit=(g===t); if(hit) hits++; rows.push({idx:i+1,g,t,hit}); } const p=binomTailGTE(n,hits,pChanceAlpha); const z=zScore(hits,n,pChanceAlpha); document.getElementById('alphaLenOut').textContent=n; document.getElementById('alphaHitsOut').textContent=hits; document.getElementById('alphaExpOut').textContent=fmt(alphaExpected(n),2); document.getElementById('alphaZOut').textContent=(z==null?'—':fmt(z,3)); document.getElementById('alphaPOut').textContent=p.toExponential(3); const body=document.getElementById('alphaBody'); body.innerHTML=''; rows.forEach(r=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td class="py-2 pr-3 text-slate-300">${r.idx}</td><td class="py-2 pr-3">${r.g}</td><td class="py-2 pr-3">${r.t}</td><td class="py-2 pr-3">${r.hit?'✔︎':'—'}</td>`; body.appendChild(tr); }); document.getElementById('alphaPanel').classList.remove('hidden'); const summary={ id:Date.now(), n, hits, expected:alphaExpected(n), z, p_one_sided:p, startedAt:new Date().toISOString(), label:'', playMode:play, pre, post:null, guess:raw, target }; if(cpp){ const f=prompt('Post: Focus (0-10)','5'); const e=prompt('Post: Energy (0-10)','5'); const m=prompt('Post: Meditation (0-10)','5'); summary.post={ focus:clamp10(f), energy:clamp10(e), meditation:clamp10(m) }; } document.getElementById('alphaSave').onclick=()=>{ if(play){ alert('Play mode: not saved.'); return; } const arr=getAlpha(); arr.push(summary); setAlpha(arr); alert('Saved.'); renderProfile(); renderHomeOverview(); }; document.getElementById('alphaExport').onclick=()=>{ const blob=new Blob([toCsvAlpha(summary)],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`fsfc_alpha_${summary.id}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); };
+    });
+    document.getElementById('alphaReset').addEventListener('click', ()=>{ alphaGuess.value=''; document.getElementById('alphaPanel').classList.add('hidden'); document.getElementById('alphaLenOut').textContent='0'; document.getElementById('alphaHitsOut').textContent='0'; document.getElementById('alphaExpOut').textContent='0'; document.getElementById('alphaZOut').textContent='—'; document.getElementById('alphaPOut').textContent='—'; });
+    function toCsvAlpha(s){ const meta=[ ['id',s.id],['n',s.n],['hits',s.hits],['expected',s.expected],['z',s.z],['p_one_sided',s.p_one_sided],['startedAt',s.startedAt],['playMode',s.playMode],['pre',JSON.stringify(s.pre||{})],['post',JSON.stringify(s.post||{})],['guess',s.guess],['target',s.target] ]; const metaCsv=meta.map(r=>r.map(x=>`"${String(x).replaceAll('"','""')}"`).join(',')).join('\n'); const header=['idx','guess','target','hit']; const rows = s.target.split('').map((t,i)=>[i+1,s.guess[i],t,s.guess[i]===t?1:0]); const tableCsv=[header.join(',')].concat(rows.map(r=>r.join(','))).join('\n'); return metaCsv+'\n\n'+tableCsv+'\n'; }
+
+    // ======= Color Game Wiring =======
+    const colorBtnsDiv = document.getElementById('colorBtns');
+    const COLOR_STYLES={ red:'#ef4444', blue:'#3b82f6', green:'#22c55e', purple:'#a855f7', yellow:'#eab308', orange:'#f97316' };
+    function renderColorButtons(){ colorBtnsDiv.innerHTML=''; COLORS.forEach(c=>{ const b=document.createElement('button'); b.className='color-swatch ring-1 ring-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed'; b.style.background=COLOR_STYLES[c]; b.style.color = (c==='yellow') ? '#111827' : 'white'; b.textContent=c; b.setAttribute('data-color',c); b.disabled=true; b.addEventListener('click', ()=> colorGuess(c)); colorBtnsDiv.appendChild(b); }); }
+    renderColorButtons();
+
+    let colorSession=null, colorDeck=null;
+    function colorUpdateDeckUI(){ const gen=document.getElementById('colorGen').value; const trials=document.getElementById('colorTrials'); const rep=document.getElementById('colorRepeats'); if(gen==='deck'){ rep.disabled=false; const r=Math.max(1,parseInt(rep.value||'5',10)); trials.value = r*6; trials.step = 6; trials.disabled=true; document.getElementById('colorNote').textContent='Balanced Deck: total trials = repeats × 6.'; } else { trials.disabled=false; trials.step = 6; document.getElementById('colorNote').textContent=''; rep.disabled=true; } }
+    document.getElementById('colorGen').addEventListener('change', colorUpdateDeckUI);
+    document.getElementById('colorRepeats').addEventListener('input', ()=>{ if(document.getElementById('colorGen').value==='deck'){ const r=Math.max(1,parseInt(document.getElementById('colorRepeats').value||'1',10)); document.getElementById('colorTrials').value=r*6; }});
+    document.getElementById('colorPP').addEventListener('change', (e)=>{ document.getElementById('colorPreBlock').classList.toggle('hidden', !e.target.checked); });
+
+    function startColor(){ const total=Math.max(6, parseInt(document.getElementById('colorTrials').value||'30',10)); const mode=document.getElementById('colorMode').value; const play=document.getElementById('colorPlay').checked; const cpp=document.getElementById('colorPP').checked; colorSession={ id:Date.now(), mode,totalTrials:total,trials:[],hits:0,ended:false,startedAt:new Date().toISOString(),endedAt:null,playMode:play,collectPP:cpp,pre:null,post:null,gen:document.getElementById('colorGen').value,repeats:parseInt(document.getElementById('colorRepeats').value||'0',10) }; if(cpp){ colorSession.pre={ focus:+document.getElementById('colorPreF').value, energy:+document.getElementById('colorPreE').value, meditation:+document.getElementById('colorPreM').value }; } if(colorSession.gen==='deck'){ const r=colorSession.repeats||Math.ceil(total/6); colorDeck=shuffle([ ...Array(r).fill('red'), ...Array(r).fill('blue'), ...Array(r).fill('green'), ...Array(r).fill('purple'), ...Array(r).fill('yellow'), ...Array(r).fill('orange') ]); } else colorDeck=null; document.querySelectorAll('#colorBtns button').forEach(b=>b.disabled=false); document.getElementById('colorResults').classList.add('hidden'); document.getElementById('colorFeedback').classList.add('hidden'); updateColorStats(); }
+
+    function colorGuess(g){ if(!colorSession||colorSession.ended) return; const idx=colorSession.trials.length+1; const target = (colorSession.gen==='deck' && colorDeck) ? colorDeck[idx-1] : rngChoice(COLORS); const hit=(g===target); colorSession.trials.push({idx,guess:g,target,hit}); if(hit) colorSession.hits++; if(colorSession.mode==='immediate') { const box=document.getElementById('colorFeedback'); const txt=document.getElementById('colorFeedbackText'); box.classList.remove('hidden'); txt.innerHTML = hit? `<span class="text-emerald-200 font-semibold">Hit!</span> Target was <span class="font-semibold">${target}</span>.` : `<span class="text-rose-200 font-semibold">Miss.</span> Target was <span class="font-semibold">${target}</span>.`; } updateColorStats(); if(colorSession.trials.length>=colorSession.totalTrials) endColor(); }
+
+    function updateColorStats(){ const n=colorSession?colorSession.trials.length:0; const h=colorSession?colorSession.hits:0; const hide=colorSession && colorSession.mode==='delayed' && !colorSession.ended; document.getElementById('colorTrial').textContent = hide?'—':`${n} / ${colorSession?colorSession.totalTrials:0}`; document.getElementById('colorHits').textContent = hide?'—':h; document.getElementById('colorExp').textContent = hide?'—':fmt(n*pChanceColor,2); const z=hide?null:zScore(h,n,pChanceColor); document.getElementById('colorZ').textContent=(z==null?'—':fmt(z,3)); const p=hide?null:binomTailGTE(n,h,pChanceColor); document.getElementById('colorP').textContent = (p===null||n===0)?'—':p.toExponential(3); }
+
+    function endColor(){
+      if(!colorSession||colorSession.ended) return;
+      colorSession.ended=true;
+      colorSession.endedAt=new Date().toISOString();
+      document.querySelectorAll('#colorBtns button').forEach(b=>b.disabled=true);
+      if(colorSession.collectPP){ const f=prompt('Post: Focus (0-10)','5'); const e=prompt('Post: Energy (0-10)','5'); const m=prompt('Post: Meditation (0-10)','5'); colorSession.post={ focus:clamp10(f), energy:clamp10(e), meditation:clamp10(m) }; }
+      renderColorResults();
+      updateColorStats();
+      if(!colorSession.playMode){ const arr=getColor(); arr.push(colorSummary()); setColor(arr); renderColorSaved(); renderProfile(); renderHomeOverview(); }
+      else { document.getElementById('colorNote').textContent='Play mode: session was NOT saved.'; }
+    }
+
+    function renderColorResults(){ const body=document.getElementById('colorBody'); body.innerHTML=''; for(const t of colorSession.trials){ const tr=document.createElement('tr'); tr.innerHTML=`<td class="py-2 pr-3 text-slate-300">${t.idx}</td><td class="py-2 pr-3">${t.guess}</td><td class="py-2 pr-3">${t.target}</td><td class="py-2 pr-3">${t.hit?'✔︎':'—'}</td>`; body.appendChild(tr); } document.getElementById('colorResults').classList.remove('hidden'); }
+
+    function colorSummary(){ const n=colorSession.trials.length, h=colorSession.hits; return { id:colorSession.id, mode:colorSession.mode, gen:colorSession.gen, repeats:colorSession.repeats, totalTrials:colorSession.totalTrials, n, hits:h, expected:n*pChanceColor, z:zScore(h,n,pChanceColor), p_one_sided:binomTailGTE(n,h,pChanceColor), startedAt:colorSession.startedAt, endedAt:colorSession.endedAt, trials:colorSession.trials, playMode:colorSession.playMode, collectPP:colorSession.collectPP, pre:colorSession.pre, post:colorSession.post }; }
+
+    function toCsvColor(s){ const meta=[ ['id',s.id],['mode',s.mode],['gen',s.gen],['repeats',s.repeats||''],['n',s.n],['hits',s.hits],['expected',s.expected],['z',s.z],['p_one_sided',s.p_one_sided],['startedAt',s.startedAt],['endedAt',s.endedAt],['playMode',s.playMode],['pre',JSON.stringify(s.pre||{})],['post',JSON.stringify(s.post||{})] ]; const metaCsv=meta.map(r=>r.map(x=>`"${String(x).replaceAll('"','""')}"`).join(',')).join('\n'); const header=['idx','guess','target','hit']; const rows=s.trials.map(t=>[t.idx,t.guess,t.target,t.hit?1:0]); const tableCsv=[header.join(',')].concat(rows.map(r=>r.join(','))).join('\n'); return metaCsv+'\n\n'+tableCsv+'\n'; }
+
+    function renderColorSaved(){ const data=getColor(); const box=document.getElementById('colorSaved'); if(!box) return; if(!data.length){ box.innerHTML='<p class="text-slate-500">No saved sessions yet.</p>'; return; } box.innerHTML=''; const ul=document.createElement('ul'); ul.className='space-y-2'; data.slice().reverse().forEach(s=>{ const li=document.createElement('li'); li.className='p-3 bg-slate-800/60 rounded-xl ring-1 ring-white/10'; li.innerHTML=`<div class="flex items-center justify-between"><div><div class="font-semibold">${new Date(s.startedAt).toLocaleString()}</div><div class="text-slate-300 text-sm">${s.n} trials • hits ${s.hits} • z ${fmt(s.z,3)} • p ${Number(s.p_one_sided).toExponential(3)} • gen ${s.gen}${s.repeats?`×${s.repeats}`:''}</div></div><button class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs" data-cdl="${s.id}">Export CSV</button></div>`; ul.appendChild(li); }); box.appendChild(ul); box.querySelectorAll('[data-cdl]').forEach(btn=>{ btn.addEventListener('click', ()=>{ const s=getColor().find(x=>String(x.id)===btn.getAttribute('data-cdl')); if(s){ const blob=new Blob([toCsvColor(s)],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`fsfc_color_${s.id}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); } }); }); }
+
+    // Buttons and controls for color
+    document.getElementById('colorStart').addEventListener('click', startColor);
+    document.getElementById('colorReset').addEventListener('click', ()=>{ colorSession=null; document.querySelectorAll('#colorBtns button').forEach(b=>b.disabled=true); document.getElementById('colorResults').classList.add('hidden'); document.getElementById('colorFeedback').classList.add('hidden'); document.getElementById('colorTrial').textContent='0 / 0'; document.getElementById('colorHits').textContent='0'; document.getElementById('colorExp').textContent='0.0'; document.getElementById('colorZ').textContent='—'; document.getElementById('colorP').textContent='—'; document.getElementById('colorNote').textContent=''; });
+    document.getElementById('colorExport').addEventListener('click', ()=>{ if(!colorSession||!colorSession.ended){ alert('Finish the session first.'); return; } const blob=new Blob([toCsvColor(colorSummary())],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`fsfc_color_${colorSession.id}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); });
+    document.getElementById('colorSave').addEventListener('click', ()=>{ if(!colorSession||!colorSession.ended){ alert('Finish the session first.'); return; } if(colorSession.playMode){ alert('Play mode: not saved.'); return; } const arr=getColor(); arr.push(colorSummary()); setColor(arr); renderColorSaved(); renderProfile(); renderHomeOverview(); });
+
+    // ======= Grid Game Wiring =======
+    const gridBtnsDiv=document.getElementById('gridBtns');
+    function renderGridButtons(){
+      const size=parseInt(document.getElementById('gridSize').value||'3',10);
+      gridBtnsDiv.innerHTML='';
+      gridBtnsDiv.className = size===4 ? 'grid grid-cols-4 gap-2 w-fit mx-auto' : 'grid grid-cols-3 gap-2 w-fit mx-auto';
+      const cells = size*size;
+      for(let i=0;i<cells;i++){
+        const b=document.createElement('button');
+        b.className='grid-btn bg-slate-800/80 hover:bg-slate-700 ring-1 ring-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed w-full max-w-[84px] h-[84px] text-lg';
+        b.textContent=String(i+1);
+        b.setAttribute('data-cell', String(i));
+        b.disabled=true;
+        b.addEventListener('click', ()=> gridGuess(i));
+        gridBtnsDiv.appendChild(b);
+      }
+    }
+    renderGridButtons();
+    document.getElementById('gridSize').addEventListener('change', ()=>{ renderGridButtons(); gridUpdateDeckUI(); });
+
+    let gridSession=null, gridDeck=null;
+    function gridUpdateDeckUI(){ const gen=document.getElementById('gridGen').value; const trials=document.getElementById('gridTrials'); const rep=document.getElementById('gridRepeats'); const size=parseInt(document.getElementById('gridSize').value||'3',10); const cells=size*size; if(gen==='deck'){ rep.disabled=false; const r=Math.max(1,parseInt(rep.value||'5',10)); trials.value = r*cells; trials.step = cells; trials.disabled=true; document.getElementById('gridNote').textContent='Balanced Deck: total trials = repeats × cells.'; } else { trials.disabled=false; trials.step = cells; document.getElementById('gridNote').textContent=''; rep.disabled=true; } }
+    document.getElementById('gridGen').addEventListener('change', gridUpdateDeckUI);
+    document.getElementById('gridRepeats').addEventListener('input', gridUpdateDeckUI);
+    document.getElementById('gridPP').addEventListener('change', (e)=>{ document.getElementById('gridPreBlock').classList.toggle('hidden', !e.target.checked); });
+
+    function startGrid(){ const size=parseInt(document.getElementById('gridSize').value||'3',10); const cells=size*size; const total=Math.max(cells, parseInt(document.getElementById('gridTrials').value||String(cells*5),10)); const mode=document.getElementById('gridMode').value; const play=document.getElementById('gridPlay').checked; const cpp=document.getElementById('gridPP').checked; gridSession={ id:Date.now(), size, cells, mode, totalTrials:total, trials:[], hits:0, ended:false, startedAt:new Date().toISOString(), endedAt:null, playMode:play, collectPP:cpp, pre:null, post:null, gen:document.getElementById('gridGen').value, repeats:parseInt(document.getElementById('gridRepeats').value||'0',10) }; if(cpp){ gridSession.pre={ focus:+document.getElementById('gridPreF').value, energy:+document.getElementById('gridPreE').value, meditation:+document.getElementById('gridPreM').value }; } if(gridSession.gen==='deck'){ const r=gridSession.repeats||Math.ceil(total/gridSession.cells); const arr=[]; for(let c=0;c<gridSession.cells;c++){ for(let i=0;i<r;i++){ arr.push(c); } } gridDeck=shuffle(arr); } else gridDeck=null; document.querySelectorAll('#gridBtns button').forEach(b=>b.disabled=false); document.getElementById('gridResults').classList.add('hidden'); document.getElementById('gridFeedback').classList.add('hidden'); updateGridStats(); }
+
+    function gridGuess(cell){ if(!gridSession||gridSession.ended) return; const idx=gridSession.trials.length+1; const target = (gridSession.gen==='deck' && gridDeck) ? gridDeck[idx-1] : Math.floor(Math.random()*gridSession.cells); const hit = (cell===target); gridSession.trials.push({idx,guess:cell,target,hit}); if(hit) gridSession.hits++; if(gridSession.mode==='immediate'){ const box=document.getElementById('gridFeedback'); const txt=document.getElementById('gridFeedbackText'); box.classList.remove('hidden'); txt.innerHTML = hit? `<span class="text-emerald-200 font-semibold">Hit!</span> Target cell was <span class="font-semibold">${target+1}</span>.` : `<span class="text-rose-200 font-semibold">Miss.</span> Target cell was <span class="font-semibold">${target+1}</span>.`; } updateGridStats(); if(gridSession.trials.length>=gridSession.totalTrials) endGrid(); }
+
+    function updateGridStats(){ const n=gridSession?gridSession.trials.length:0; const h=gridSession?gridSession.hits:0; const hide=gridSession && gridSession.mode==='delayed' && !gridSession.ended; const p=1/(gridSession?gridSession.cells:9); document.getElementById('gridTrial').textContent = hide?'—':`${n} / ${gridSession?gridSession.totalTrials:0}`; document.getElementById('gridHits').textContent = hide?'—':h; document.getElementById('gridExp').textContent = hide?'—':fmt(n*p,2); const z=hide?null:zScore(h,n,p); document.getElementById('gridZ').textContent=(z==null?'—':fmt(z,3)); const pv=hide?null:binomTailGTE(n,h,p); document.getElementById('gridP').textContent=(pv===null||n===0)?'—':pv.toExponential(3); }
+
+    function endGrid(){
+      if(!gridSession||gridSession.ended) return;
+      gridSession.ended=true;
+      gridSession.endedAt=new Date().toISOString();
+      document.querySelectorAll('#gridBtns button').forEach(b=>b.disabled=true);
+      if(gridSession.collectPP){ const f=prompt('Post: Focus (0-10)','5'); const e=prompt('Post: Energy (0-10)','5'); const m=prompt('Post: Meditation (0-10)','5'); gridSession.post={ focus:clamp10(f), energy:clamp10(e), meditation:clamp10(m) }; }
+      renderGridResults();
+      updateGridStats();
+      if(!gridSession.playMode){ const arr=getGrid(); arr.push(gridSummary()); setGrid(arr); renderGridSaved(); renderProfile(); renderHomeOverview(); }
+      else { document.getElementById('gridNote').textContent='Play mode: session was NOT saved.'; }
+    }
+
+    function renderGridResults(){ const body=document.getElementById('gridBody'); body.innerHTML=''; for(const t of gridSession.trials){ const tr=document.createElement('tr'); tr.innerHTML=`<td class="py-2 pr-3 text-slate-300">${t.idx}</td><td class="py-2 pr-3">${t.guess+1}</td><td class="py-2 pr-3">${t.target+1}</td><td class="py-2 pr-3">${t.hit?'✔︎':'—'}</td>`; body.appendChild(tr); } document.getElementById('gridResults').classList.remove('hidden'); }
+
+    function gridSummary(){ const n=gridSession.trials.length, h=gridSession.hits; const p=1/gridSession.cells; return { id:gridSession.id, size:gridSession.size, cells:gridSession.cells, mode:gridSession.mode, gen:gridSession.gen, repeats:gridSession.repeats, totalTrials:gridSession.totalTrials, n, hits:h, expected:n*p, z:zScore(h,n,p), p_one_sided:binomTailGTE(n,h,p), startedAt:gridSession.startedAt, endedAt:gridSession.endedAt, trials:gridSession.trials, playMode:gridSession.playMode, collectPP:gridSession.collectPP, pre:gridSession.pre, post:gridSession.post } }
+
+    function toCsvGrid(s){ const meta=[ ['id',s.id],['size',s.size],['cells',s.cells],['mode',s.mode],['gen',s.gen],['repeats',s.repeats||''],['n',s.n],['hits',s.hits],['expected',s.expected],['z',s.z],['p_one_sided',s.p_one_sided],['startedAt',s.startedAt],['endedAt',s.endedAt],['playMode',s.playMode],['pre',JSON.stringify(s.pre||{})],['post',JSON.stringify(s.post||{})] ]; const metaCsv=meta.map(r=>r.map(x=>`"${String(x).replaceAll('"','""')}"`).join(',')).join('\n'); const header=['idx','guess','target','hit']; const rows=s.trials.map(t=>[t.idx,t.guess+1,t.target+1,t.hit?1:0]); const tableCsv=[header.join(',')].concat(rows.map(r=>r.join(','))).join('\n'); return metaCsv+'\n\n'+tableCsv+'\n'; }
+
+    function renderGridSaved(){ const data=getGrid(); const box=document.getElementById('gridSaved'); if(!box) return; if(!data.length){ box.innerHTML='<p class="text-slate-500">No saved sessions yet.</p>'; return; } box.innerHTML=''; const ul=document.createElement('ul'); ul.className='space-y-2'; data.slice().reverse().forEach(s=>{ const li=document.createElement('li'); li.className='p-3 bg-slate-800/60 rounded-xl ring-1 ring-white/10'; li.innerHTML=`<div class=\"flex items-center justify-between\"><div><div class=\"font-semibold\">${new Date(s.startedAt).toLocaleString()}</div><div class=\"text-slate-300 text-sm\">${s.size}×${s.size} • ${s.n} trials • hits ${s.hits} • z ${fmt(s.z,3)} • p ${Number(s.p_one_sided).toExponential(3)} • gen ${s.gen}${s.repeats?`×${s.repeats}`:''}</div></div><button class=\"px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs\" data-gdl=\"${s.id}\">Export CSV</button></div>`; ul.appendChild(li); }); box.appendChild(ul); box.querySelectorAll('[data-gdl]').forEach(btn=>{ btn.addEventListener('click', ()=>{ const s=getGrid().find(x=>String(x.id)===btn.getAttribute('data-gdl')); if(s){ const blob=new Blob([toCsvGrid(s)],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`fsfc_grid_${s.id}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href); } }); }); }
+
+    // Wire up Grid buttons
+    document.getElementById('gridStart').addEventListener('click', startGrid);
+    document.getElementById('gridReset').addEventListener('click', ()=>{ gridSession=null; document.querySelectorAll('#gridBtns button').forEach(b=>b.disabled=true); document.getElementById('gridResults').classList.add('hidden'); document.getElementById('gridFeedback').classList.add('hidden'); document.getElementById('gridTrial').textContent='0 / 0'; document.getElementById('gridHits').textContent='0'; document.getElementById('gridExp').textContent='0.0'; document.getElementById('gridZ').textContent='—'; document.getElementById('gridP').textContent='—'; document.getElementById('gridNote').textContent=''; });
+
+    // ======= Init =======
+    function initColor(){ renderColorButtons(); colorUpdateDeckUI(); renderColorSaved(); }
+    function initGrid(){ renderGridButtons(); gridUpdateDeckUI(); renderGridSaved(); }
+
+    renderSavedList(); renderProfile(); renderHomeOverview(); initColor(); initGrid(); switchTab('home');
+    document.getElementById('statsGame').addEventListener('change', renderStats);
+
+    // ======= Quick sanity tests (non-blocking) =======
+    (function(){
+      function approx(a,b,eps=1e-9){ return Math.abs(a-b) < eps; }
+      // Binomial PMF sums to ~1
+      let s=0; const n=6, p=1/6; for(let k=0;k<=n;k++) s+=binomPMF(n,k,p); console.assert(approx(s,1,1e-6), 'PMF should sum to 1, got', s);
+      // zScore basic check
+      const zt=zScore(1,1,0.2); console.assert(Number.isFinite(zt), 'zScore finite');
+    })();
+  </script>
+</body>
+</html>
